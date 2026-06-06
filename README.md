@@ -1,44 +1,97 @@
-# Booking — minimal template
+# Booking — เทมเพลตจองคิวแบบมินิมอล
 
-A tiny, dependency-free template for managing generic slot-based appointment
-bookings. A booking is a **resource** held for a **time slot** (`start`/`end`)
-for a **name**, persisted to a local JSON file.
+เทมเพลตขนาดเล็กที่ **ไม่ต้องติดตั้ง dependency ใด ๆ** สำหรับจัดการการจอง
+"ช่วงเวลา" (slot-based booking) แบบทั่วไป เช่น จองห้องประชุม จองโต๊ะ จองอุปกรณ์
+หรือจองคิวนัดหมายต่าง ๆ
 
-## Requirements
+แนวคิดหลัก: การจอง 1 รายการ คือการกัน **ทรัพยากร** (`resource`) หนึ่งชิ้นไว้สำหรับ
+**ช่วงเวลา** หนึ่งช่วง (`start`/`end`) ในชื่อของ **ผู้จอง** (`name`) โดยข้อมูลทั้งหมด
+ถูกเก็บลงไฟล์ JSON ในเครื่อง (`data/bookings.json`) ไม่ต้องใช้ฐานข้อมูลภายนอก
 
-Node **v24+** (runs `.ts` files natively via built-in type stripping — no
-`npm install`, no build step).
+กฎสำคัญข้อเดียวที่ระบบบังคับ: **ทรัพยากรชิ้นเดียวกันจะถูกจองให้เวลาทับซ้อนกันไม่ได้**
+ถ้าช่วงเวลาที่ขอจองชนกับการจองที่ยืนยันแล้ว (`confirmed`) ระบบจะปฏิเสธ
 
-## Layout
+## ความต้องการของระบบ (Requirements)
+
+ต้องใช้ **Node.js เวอร์ชัน 24 ขึ้นไป** เท่านั้น
+
+เหตุผลคือ Node v24+ สามารถรันไฟล์ `.ts` (TypeScript) ได้โดยตรงผ่านความสามารถ
+"type stripping" ที่มีมาในตัว — มันจะลบส่วนที่เป็น type annotation ออกแล้วรันเป็น
+JavaScript ทันที ทำให้โปรเจกต์นี้ **ไม่ต้อง `npm install` และไม่ต้องมีขั้นตอน build**
+เลย แค่มี Node ก็รันได้
+
+## โครงสร้างไฟล์ (Layout)
 
 ```
 .
-├── skill.md            # skill definition + usage for Claude
-├── README.md           # this file
-├── tsconfig.json       # editor/type-check support (not needed to run)
+├── skill.md            # นิยาม skill + วิธีใช้งานสำหรับ Claude
+├── README.md           # ไฟล์นี้
+├── tsconfig.json       # ใช้ช่วยให้ editor ตรวจ type ได้ (ไม่จำเป็นต่อการรัน)
 ├── scripts/
-│   └── booking.ts      # the CLI
+│   └── booking.ts      # ตัวโปรแกรม CLI ทั้งหมดอยู่ในไฟล์นี้
 └── data/
-    └── bookings.json   # storage (a JSON array)
+    └── bookings.json   # ที่เก็บข้อมูล (เป็น JSON array)
 ```
 
-## Usage
+## โครงสร้างข้อมูลของการจอง 1 รายการ
 
-Run from the project root:
+แต่ละรายการในไฟล์ `data/bookings.json` มีหน้าตาดังนี้:
+
+```json
+{
+  "id": "bk_0001",                     // รหัสที่ระบบสร้างให้อัตโนมัติ เรียงเลขขึ้นเรื่อย ๆ
+  "resource": "room-a",                // ชื่อทรัพยากรที่ถูกจอง
+  "start": "2026-06-10T14:00",         // เวลาเริ่ม (ISO-8601 แบบ local)
+  "end": "2026-06-10T15:00",           // เวลาสิ้นสุด
+  "name": "Alice",                     // ชื่อผู้จอง
+  "status": "confirmed",               // สถานะ: confirmed หรือ cancelled
+  "createdAt": "2026-06-06T..."        // เวลาที่สร้างรายการ
+}
+```
+
+## วิธีใช้งาน (Usage)
+
+รันคำสั่งทุกอย่างจากโฟลเดอร์รากของโปรเจกต์:
 
 ```sh
-# Create a booking (prints the new id, e.g. bk_0001)
+# 1) สร้างการจองใหม่ (เมื่อสำเร็จจะพิมพ์รหัสที่ได้ออกมา เช่น bk_0001)
 node scripts/booking.ts add --resource room-a --start 2026-06-10T14:00 --end 2026-06-10T15:00 --name Alice
 
-# Is a slot free? (AVAILABLE -> exit 0, CONFLICT -> exit 1)
+# 2) เช็กว่าช่วงเวลานั้นว่างหรือไม่
+#    ถ้าว่าง  -> พิมพ์ AVAILABLE และ exit code = 0
+#    ถ้าชน    -> พิมพ์ CONFLICT พร้อมรายการที่ชน และ exit code = 1
 node scripts/booking.ts availability --resource room-a --start 2026-06-10T14:00 --end 2026-06-10T15:00
 
-# List bookings (hides cancelled by default)
+# 3) ดูรายการจอง (ค่าเริ่มต้นจะซ่อนรายการที่ถูกยกเลิกไว้)
 node scripts/booking.ts list --date 2026-06-10
 
-# Cancel (soft delete — kept with status: cancelled)
+# 4) ยกเลิกการจอง (เป็น soft delete — ไม่ได้ลบทิ้ง แต่เปลี่ยน status เป็น cancelled)
 node scripts/booking.ts cancel --id bk_0001
 ```
 
-Times are ISO-8601 local strings (`YYYY-MM-DDTHH:MM`). Two confirmed bookings for
-the same resource may not overlap.
+### อธิบายแต่ละคำสั่ง
+
+- **`add`** — สร้างการจองใหม่ ต้องระบุครบทั้ง `--resource`, `--start`, `--end`, `--name`
+  ระบบจะตรวจว่า `start` ต้องมาก่อน `end` และต้องไม่มีการจองที่ยืนยันแล้วของทรัพยากร
+  เดียวกันมาทับช่วงเวลานี้ ถ้าผ่านทั้งหมดจึงบันทึกและพิมพ์รหัสการจองออกมา
+
+- **`availability`** — ตรวจว่าช่วงเวลาที่ขอว่างหรือไม่ โดยไม่ได้สร้างการจองจริง
+  เหมาะกับการนำ exit code (0 = ว่าง, 1 = ชน) ไปใช้ต่อในสคริปต์อื่น
+
+- **`list`** — แสดงรายการจอง กรองเพิ่มได้ด้วย `--resource`, `--date` (รูปแบบ `YYYY-MM-DD`)
+  และ `--status` (`confirmed` หรือ `cancelled`) ผลลัพธ์จะเรียงตามเวลาเริ่ม
+  ถ้าไม่ระบุ `--status` จะซ่อนรายการที่ยกเลิกไว้โดยอัตโนมัติ
+
+- **`cancel`** — ยกเลิกการจองตาม `--id` เป็นการลบแบบ soft (ยังเก็บข้อมูลไว้ แต่ตั้ง
+  สถานะเป็น `cancelled`) หากยกเลิกซ้ำรายการเดิมจะแจ้งว่าถูกยกเลิกไปแล้ว
+
+> ใช้ `node scripts/booking.ts help` เพื่อดูสรุปคำสั่งทั้งหมดได้ทุกเมื่อ
+
+## เรื่องเวลาและการชนกันของช่วงเวลา
+
+- เวลาทุกค่าเป็นสตริงรูปแบบ **ISO-8601 แบบ local** คือ `YYYY-MM-DDTHH:MM`
+  เช่น `2026-06-10T14:00`
+- การจองที่ยืนยันแล้ว 2 รายการของทรัพยากรเดียวกัน **ห้ามมีเวลาทับซ้อนกัน**
+- นิยามของ "ทับซ้อน": สองช่วงเวลาจะถือว่าชนกันก็ต่อเมื่อ แต่ละช่วงเริ่มก่อนที่อีกช่วง
+  จะสิ้นสุด (`A.start < B.end` และ `A.end > B.start`) ดังนั้นการจองที่ต่อกันพอดี เช่น
+  ช่วงหนึ่งจบ `15:00` แล้วอีกช่วงเริ่ม `15:00` จะ **ไม่** ถือว่าชนกัน — จองติดกันได้
